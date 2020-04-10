@@ -6,24 +6,36 @@ import sys
 
 
 # Get genes from file. Pass as a command line argument and convert to upper case
-if(len(sys.argv) >= 1):
+
+try:
+    file_name = sys.argv[1]
+except Exception as e:
     print("Did not supply min argument: file path to gene list")
     os.sys.exit()
 
-file_name = sys.argv[0]
-num_interactors = sys.argv[1]
-cutoff = sys.argv[2]
+try:
+    num_interactors = sys.argv[2]
+    limit = num_interactors
+except Exception as e:
+    limit = 10
+
+try:
+    cutoff = float(sys.argv[3])
+except Exception as e:
+    cutoff = 0
+
 geneList = open(file_name).read().splitlines()
 for i in range(0,len(geneList)):
     geneList[i] = geneList[i].upper()
 
 
 # Get Interaction Network
+string_api_url = "http://string-db.org/api"
+output_format = "tsv-no-header"
 
 method = "interaction_partners"
 my_genes = geneList
 species = "9606"
-limit = 10
 my_app = "WilkieLab"
 
 ## Construct the request
@@ -47,13 +59,15 @@ for line in response.text.strip().split("\n"):
     input_identifier, interactor = l[2], l[3]
     if input_identifier not in Interactors_Map:
         Interactors_Map[input_identifier] = []
-
-    Interactors_Map[input_identifier].append(interactor)
     exp_score = float(l[5])
-    #print(exp_score)
+    if exp_score > cutoff:
+        Interactors_Map[input_identifier].append(interactor)
+
 
 # Write to file tab delim column wise
 with open("output.txt", "w") as f:
     writer = csv.writer(f, delimiter = "\t")
     writer.writerow(Interactors_Map.keys())
     writer.writerows(zip(*Interactors_Map.values()))
+
+print("Job completed see results in output.txt")
