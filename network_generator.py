@@ -14,7 +14,7 @@ except Exception as e:
     os.sys.exit()
 
 try:
-    num_interactors = sys.argv[2]
+    num_interactors = int(sys.argv[2])
     limit = num_interactors
 except Exception as e:
     limit = 10
@@ -38,36 +38,48 @@ my_genes = geneList
 species = "9606"
 my_app = "WilkieLab"
 
-## Construct the request
-request_url = string_api_url + "/" + output_format + "/" + method + "?"
-request_url += "identifiers=%s" % "%0d".join(my_genes)
-request_url += "&" + "species=" + species
-request_url += "&" + "limit=" + str(limit)
-request_url += "&" + "caller_identity=" + my_app
-
-
-try:
-    response = requests.post(request_url)
-except requests.exceptions.RequestException as e:
-    print(e)
-    os.sys.exit()
-
-## Read and parse the results
+# Construct the request and send a request per 100 genes
 Interactors_Map = {}
-for line in response.text.strip().split("\n"):
-    l = line.split("\t")
-    input_identifier, interactor = l[2], l[3]
-    if input_identifier not in Interactors_Map:
-        Interactors_Map[input_identifier] = []
-    exp_score = float(l[5])
-    if exp_score > cutoff:
-        Interactors_Map[input_identifier].append(interactor)
+chunks = (len(my_genes) - 1) // 100 + 1
 
+for i in range(chunks):
+    request_url = string_api_url + "/" + output_format + "/" + method + "?"
+    request_url += "identifiers=%s" % "%0d".join(my_genes[i*100:(i+1)*100])
+    request_url += "&" + "species=" + species
+    if(limit != 0):
+        request_url += "&" + "limit=" + str(limit)
+    request_url += "&" + "caller_identity=" + my_app
+
+
+    try:
+        response = requests.post(request_url)
+        print("Finshed request {}".format(i + 1))
+    except requests.exceptions.RequestException as e:
+        print(e)
+        os.sys.exit()
+
+    ## Read and parse the results
+
+    for line in response.text.strip().split("\n"):
+        l = line.split("\t")
+        input_identifier, interactor = l[2], l[3]
+        if input_identifier not in Interactors_Map:
+            Interactors_Map[input_identifier] = []
+        exp_score = float(l[5])
+        if exp_score > cutoff:
+            Interactors_Map[input_identifier].append(interactor)
 
 # Write to file tab delim column wise
-with open("output.txt", "w") as f:
-    writer = csv.writer(f, delimiter = "\t")
-    writer.writerow(Interactors_Map.keys())
-    writer.writerows(zip(*Interactors_Map.values()))
+outname = file_name.replace(".txt", "") + "_output.txt"
+with open(outname, "w") as f:
+    for k in Interactors_Map.keys():
+        f.write(k)
+        f.write("\t")
+        for v_j in range(len(Interactors_Map[k])):
+            f.write(Interactors_Map[k][v_j])
+            f.write("\t")
+        f.write("\n")
 
-print("Job completed see results in output.txt")
+
+
+print("Job completed see results in *_output.txt")
